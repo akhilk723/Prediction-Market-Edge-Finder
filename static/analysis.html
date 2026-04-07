@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>EdgeFinder — Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#121116;--surface:#1C1C23;--surface-up:#252530;--border:#383845;
+--green:#38DA8C;--green-dim:#0D2418;--white:#EEEEF2;--mid:#8C8C96;
+--dim:#595966;--red:#F25454;--red-dim:#2A1010;--amber:#FABA2E;--amber-dim:#281E05;
+}
+html{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--white);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+body{min-height:100vh;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+.nav{height:56px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 40px;position:sticky;top:0;z-index:100}
+.nav-left{display:flex;align-items:center}
+.nav-logo{font-size:14px;font-weight:700;color:var(--green);letter-spacing:.5px}
+.nav-slash{color:var(--dim);font-size:11px;margin:0 10px;font-weight:500}
+.nav-sub{color:var(--dim);font-size:11px;font-weight:500;letter-spacing:.8px}
+.nav-right{display:flex;align-items:center;gap:28px}
+.nav-link{color:var(--mid);font-size:13px;font-weight:500;transition:color .15s}
+.nav-link:hover{color:var(--white)}
+.nav-login{color:var(--mid);font-size:13px;font-weight:500;padding:7px 16px;background:var(--surface-up);border:1px solid var(--border);border-radius:6px;transition:border-color .15s,color .15s}
+.nav-login:hover{border-color:var(--dim);color:var(--white)}
+.nav-signup{font-size:13px;font-weight:600;padding:7px 18px;background:var(--green);color:#0a0a0f;border-radius:6px;transition:opacity .15s}
+.nav-signup:hover{opacity:.88}
+.breadcrumb{height:32px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 40px;font-size:11px}
+.bread-back{color:var(--dim);display:flex;align-items:center;gap:6px;transition:color .15s}
+.bread-back:hover{color:var(--mid)}
+.bread-url{color:var(--mid);font-family:'Courier New',monospace;font-size:12px;letter-spacing:.3px}
+.bread-time{color:var(--dim)}
+.main{max-width:1440px;margin:0 auto;padding:24px 72px 64px;display:flex;gap:24px;align-items:flex-start}
+.col-left{width:740px;flex-shrink:0;display:flex;flex-direction:column;gap:12px}
+.col-right{width:420px;flex-shrink:0;position:sticky;top:112px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px}
+.tag{display:inline-block;font-size:10px;font-weight:600;letter-spacing:.8px;padding:3px 10px;border-radius:4px;margin-bottom:16px}
+.tag-amber{background:var(--amber-dim);color:var(--amber)}
+.tag-green{background:var(--green-dim);color:var(--green)}
+.tag-red{background:var(--red-dim);color:var(--red)}
+.contract-title{font-size:24px;font-weight:700;color:var(--white);line-height:1.25;margin-bottom:30px}
+.contract-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.stat-pill{display:inline-flex;align-items:center;padding:6px 14px;border-radius:6px;font-size:14px;font-weight:500}
+.stat-yes{background:var(--green-dim);color:var(--green)}
+.stat-no{background:var(--surface-up);color:var(--mid)}
+.card-edge{border-left:3px solid var(--green)}
+.card-edge.no-edge{border-left-color:var(--dim)}
+.card-edge.slight-edge{border-left-color:var(--amber)}
+.edge-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.edge-label{font-size:10px;font-weight:600;color:var(--green);letter-spacing:1px}
+.confidence-badge{font-size:11px;font-weight:600;color:var(--green);background:var(--green-dim);padding:4px 12px;border-radius:100px}
+.confidence-badge.medium{background:var(--amber-dim);color:var(--amber)}
+.confidence-badge.low{background:var(--surface-up);color:var(--dim)}
+.edge-banner{background:var(--green-dim);margin:0 -28px;padding:0 28px;height:56px;display:flex;align-items:center;margin-bottom:18px}
+.edge-banner.no-edge{background:var(--surface-up)}
+.edge-banner.slight-edge{background:var(--amber-dim)}
+.edge-found{font-size:28px;font-weight:700;color:var(--green);line-height:1}
+.edge-found.no-edge{color:var(--dim)}
+.edge-found.slight-edge{color:var(--amber)}
+.edge-summary{font-size:16px;line-height:1.55;color:var(--white);opacity:.88;margin-bottom:24px}
+.edge-divider{height:1px;background:var(--border);margin-bottom:20px}
+.evidence{display:flex;flex-direction:column;gap:16px}
+.ev-row{display:flex;gap:14px;align-items:flex-start}
+.ev-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.ev-dot.green{background:var(--green)}.ev-dot.red{background:var(--red)}.ev-dot.amber{background:var(--amber)}
+.ev-body{flex:1;min-width:0}
+.ev-title{font-size:13px;font-weight:500;color:var(--white);margin-bottom:3px}
+.ev-desc{font-size:12px;line-height:1.5;color:var(--mid)}
+.mm-header{font-size:10px;font-weight:600;color:var(--green);letter-spacing:1px;margin-bottom:24px}
+.mm-row{margin-bottom:20px}.mm-row:last-of-type{margin-bottom:16px}
+.mm-label{font-size:12px;font-weight:500;color:var(--mid);margin-bottom:8px}
+.mm-bar-row{display:flex;align-items:center;gap:14px}
+.mm-bar-track{flex:1;max-width:400px;height:10px;background:var(--surface-up);border-radius:5px;position:relative}
+.mm-bar-fill{height:100%;border-radius:5px;position:relative}
+.mm-bar-fill.market{background:var(--green);opacity:.55}
+.mm-bar-fill.model{background:var(--green)}
+.mm-bar-marker{position:absolute;right:-1px;top:-2px;width:4px;height:14px;background:var(--white);border-radius:2px}
+.mm-bar-pct{font-size:12px;font-weight:600;color:var(--green);min-width:36px}
+.mm-gap{font-size:13px;line-height:1.5;color:var(--mid);margin-top:4px}
+.mm-gap strong{color:var(--white);font-weight:600}
+.sp-header{font-size:10px;font-weight:600;color:var(--green);letter-spacing:1px;margin-bottom:16px}
+.sp-action{font-size:28px;font-weight:700;color:var(--white);margin-bottom:10px}
+.sp-sub{font-size:14px;line-height:1.5;color:var(--mid);margin-bottom:16px}
+.sp-disclaimer{font-size:11px;color:var(--dim);font-style:italic;line-height:1.45}
+.sim-header{font-size:10px;font-weight:600;color:var(--green);letter-spacing:1px;margin-bottom:16px}
+.sim-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.sim-row:last-of-type{border-bottom:none;padding-bottom:0}.sim-row:first-of-type{padding-top:0}
+.sim-left{flex:1;min-width:0}
+.sim-name{font-size:12px;font-weight:500;color:var(--white);margin-bottom:3px}
+.sim-pct{font-size:11px;color:var(--mid)}
+.sim-badge{font-size:10px;font-weight:600;padding:3px 8px;border-radius:4px;flex-shrink:0;margin-left:12px}
+.sim-badge.edge{background:var(--green-dim);color:var(--green)}
+.sim-badge.no-edge{background:var(--surface-up);color:var(--dim)}
+.sim-footer{margin-top:14px}
+.sim-footer a{font-size:12px;font-weight:500;color:var(--green);transition:opacity .15s}
+.sim-footer a:hover{opacity:.75}
+.ad-header{font-size:10px;font-weight:600;color:var(--green);letter-spacing:1px;margin-bottom:14px}
+.ad-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)}
+.ad-row:last-of-type{border-bottom:none;padding-bottom:0}.ad-row:first-of-type{padding-top:0}
+.ad-key{font-size:12px;color:var(--dim)}
+.ad-val{font-size:12px;color:var(--white);font-weight:500;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.actions{display:flex;flex-direction:column;gap:8px}
+.btn-secondary{width:100%;height:40px;display:flex;align-items:center;justify-content:center;background:var(--surface-up);border:1px solid var(--border);border-radius:8px;color:var(--white);font-size:13px;font-weight:500;transition:border-color .15s}
+.btn-secondary:hover{border-color:var(--dim)}
+.btn-primary{width:100%;height:40px;display:flex;align-items:center;justify-content:center;background:var(--green);border-radius:8px;color:#0a0a0f;font-size:13px;font-weight:600;transition:opacity .15s}
+.btn-primary:hover{opacity:.88}
+@media(max-width:1300px){
+.main{flex-direction:column;padding:24px 32px 48px}
+.col-left,.col-right{width:100%;max-width:740px}
+.col-right{position:static}
+}
+@media(max-width:640px){
+.main{padding:16px 16px 40px}
+.card{padding:20px}
+.contract-title{font-size:20px}
+.edge-found{font-size:22px}
+.edge-banner{margin:0 -20px;padding:12px 20px}
+.breadcrumb{padding:0 16px}
+.nav{padding:0 16px}
+.bread-url{display:none}
+}
+</style>
+</head>
+<body>
+<script>
+// Immediately read and clear localStorage before anything renders
+var _raw = localStorage.getItem('edgefinder_result');
+var _url = localStorage.getItem('edgefinder_url') || '';
+localStorage.removeItem('edgefinder_result');
+if (!_raw) { window.location.replace('/'); }
+
+(function(){
+  if (!_raw) return;
+  var d;
+  try { d = JSON.parse(_raw); } catch(e) { window.location.replace('/'); return; }
+
+  var yesPct = d.market_yes_pct;
+  var noPct = 100 - yesPct;
+  var signal = d.edge_signal;
+  var gap = Math.abs(d.model_yes_pct - yesPct);
+  var src = d._sources || {};
+
+  var catColors = {ECONOMICS:'amber',MARKETS:'amber',CRYPTO:'green',SPORTS:'red',TECH:'green',POLITICS:'red',CLIMATE:'green'};
+  var catColor = catColors[d.category] || 'amber';
+
+  var edgeCardClass = 'card card-edge';
+  var bannerClass = 'edge-banner';
+  var signalClass = 'edge-found';
+  var confClass = 'confidence-badge';
+  if (signal === 'NO EDGE') { edgeCardClass += ' no-edge'; bannerClass += ' no-edge'; signalClass += ' no-edge'; }
+  else if (signal === 'SLIGHT EDGE') { edgeCardClass += ' slight-edge'; bannerClass += ' slight-edge'; signalClass += ' slight-edge'; }
+  if (d.confidence === 'Medium') confClass += ' medium';
+  if (d.confidence === 'Low') confClass += ' low';
+
+  var signalDotMap = {SUPPORTING:'green',OPPOSING:'red',NEUTRAL:'amber'};
+  var evHTML = '';
+  (d.evidence || []).forEach(function(ev){
+    var dc = signalDotMap[ev.signal] || 'amber';
+    evHTML += '<div class="ev-row"><div class="ev-dot '+dc+'"></div><div class="ev-body"><div class="ev-title">'+esc(ev.title)+'</div><p class="ev-desc">'+esc(ev.detail)+'</p></div></div>';
+  });
+
+  var subParts = '';
+  if (d.entry_price) subParts += 'At current price of '+esc(d.entry_price)+'.';
+  if (d.target_exit) subParts += ' Target exit at '+esc(d.target_exit)+'.';
+
+  var gapHTML = gap >= 5
+    ? '<strong>'+gap+' point gap</strong> \u2014 statistically meaningful above our 5-point threshold for flagging an edge.'
+    : '<strong>'+gap+' point gap</strong> \u2014 below our 5-point threshold. No significant edge detected.';
+
+  var ticker = (src.ticker||'\u2014').substring(0,30);
+
+  document.title = 'EdgeFinder \u2014 ' + d.contract_title;
+
+  // Write entire page body at once — no stale DOM possible
+  document.body.innerHTML = ''
+  +'<nav class="nav"><div class="nav-left"><a href="/" style="display:flex;align-items:center"><span class="nav-logo">EDGEFINDER</span></a><span class="nav-slash">/</span><span class="nav-sub">KALSHI ANALYSIS</span></div><div class="nav-right"><a href="/#markets" class="nav-link">Markets</a><a href="/#how" class="nav-link">How it works</a></div></nav>'
+
+  +'<div class="breadcrumb"><a href="/" class="bread-back">\u2190 Back to markets</a><span class="bread-url">'+esc(_url)+'</span><span class="bread-time" id="bread-time">Last analyzed: just now</span></div>'
+
+  +'<div class="main"><div class="col-left">'
+
+  // Contract header
+  +'<div class="card"><div class="tag tag-'+catColor+'">'+esc(d.category)+'</div><h1 class="contract-title">'+esc(d.contract_title)+'</h1><div class="contract-meta"><span class="stat-pill stat-yes">YES\u00a0\u00a0'+yesPct+'%</span><span class="stat-pill stat-no">NO\u00a0\u00a0'+noPct+'%</span></div></div>'
+
+  // Edge verdict
+  +'<div class="'+edgeCardClass+'"><div class="edge-header"><span class="edge-label">EDGE ANALYSIS</span><span class="'+confClass+'">Confidence: '+esc(d.confidence)+'</span></div><div class="'+bannerClass+'"><span class="'+signalClass+'">'+esc(signal)+'</span></div><p class="edge-summary">'+esc(d.verdict_summary)+'</p><div class="edge-divider"></div><div class="evidence">'+evHTML+'</div></div>'
+
+  // Model vs Market
+  +'<div class="card"><div class="mm-header">MODEL vs MARKET</div><div class="mm-row"><div class="mm-label">Market implies</div><div class="mm-bar-row"><div class="mm-bar-track"><div class="mm-bar-fill market" id="bar-market" style="width:0%"><div class="mm-bar-marker"></div></div></div><span class="mm-bar-pct">'+yesPct+'%</span></div></div><div class="mm-row"><div class="mm-label">Our model</div><div class="mm-bar-row"><div class="mm-bar-track"><div class="mm-bar-fill model" id="bar-model" style="width:0%"><div class="mm-bar-marker"></div></div></div><span class="mm-bar-pct">'+d.model_yes_pct+'%</span></div></div><p class="mm-gap">'+gapHTML+'</p></div>'
+
+  // Suggested position
+  +'<div class="card"><div class="sp-header">SUGGESTED POSITION</div><div class="sp-action">'+esc(d.suggested_position)+'</div><p class="sp-sub">'+subParts+'</p><p class="sp-disclaimer">This is not financial advice. EdgeFinder provides research tools only.</p></div>'
+
+  +'</div><div class="col-right">'
+
+  // Similar markets
+  +(function(){
+    var sm = d.similar_markets || [];
+    if (!sm.length) return '<div class="card" style="padding:20px"><div class="sim-header">SIMILAR MARKETS</div><div class="sim-footer"><a href="/">Analyze another market \u2192</a></div></div>';
+    var h = '<div class="card" style="padding:20px"><div class="sim-header">SIMILAR MARKETS</div>';
+    sm.forEach(function(m){
+      var bc = m.has_edge ? 'sim-badge edge' : 'sim-badge no-edge';
+      var bl = m.has_edge ? 'EDGE' : 'NO EDGE';
+      h += '<div class="sim-row"><div class="sim-left"><div class="sim-name">'+esc(m.name)+'</div><div class="sim-pct">YES '+m.yes_pct+'%</div></div><span class="'+bc+'">'+bl+'</span></div>';
+    });
+    h += '<div class="sim-footer"><a href="/">Analyze another market \u2192</a></div></div>';
+    return h;
+  })()
+
+  // Analysis details
+  +'<div class="card" style="padding:20px"><div class="ad-header">ANALYSIS DETAILS</div><div class="ad-row"><span class="ad-key">Kalshi live data</span><span class="ad-val"'+(src.kalshi_live?' style="color:#38DA8C"':'')+'>'+( src.kalshi_live?'Connected':'Not available')+'</span></div><div class="ad-row"><span class="ad-key">News articles</span><span class="ad-val">'+(src.news_count||0)+' articles</span></div><div class="ad-row"><span class="ad-key">Web sources</span><span class="ad-val">'+(src.web_count||0)+' results</span></div><div class="ad-row"><span class="ad-key">Market ticker</span><span class="ad-val">'+esc(ticker)+'</span></div><div class="ad-row"><span class="ad-key">Model</span><span class="ad-val">Claude Sonnet 4</span></div></div>'
+
+  // Actions
+  +'<div class="card" style="padding:20px"><div class="actions"><button class="btn-secondary" id="btn-save">Save analysis</button><button class="btn-secondary" id="btn-copy">Copy link</button><button class="btn-primary" id="btn-kalshi">Open on Kalshi \u2192</button></div></div>'
+
+  +'</div></div>';
+
+  // Animate bars
+  setTimeout(function(){
+    document.getElementById('bar-market').style.cssText='width:'+yesPct+'%;transition:width .9s cubic-bezier(.22,1,.36,1)';
+    document.getElementById('bar-model').style.cssText='width:'+d.model_yes_pct+'%;transition:width .9s cubic-bezier(.22,1,.36,1)';
+  },50);
+
+  // Timer
+  var s=0,m=0,tEl=document.getElementById('bread-time');
+  setInterval(function(){s++;if(s>=60){s=0;m++;}tEl.textContent=m>0?'Last analyzed: '+m+' min ago':'Last analyzed: '+s+'s ago';},1000);
+
+  // Buttons
+  document.getElementById('btn-copy').addEventListener('click',function(){navigator.clipboard.writeText(window.location.href);this.textContent='Copied!';var self=this;setTimeout(function(){self.textContent='Copy link';},1500);});
+  document.getElementById('btn-save').addEventListener('click',function(){var h=JSON.parse(localStorage.getItem('edgefinder_history')||'[]');h.unshift({url:_url,data:d,date:new Date().toISOString()});localStorage.setItem('edgefinder_history',JSON.stringify(h));this.textContent='Saved!';var self=this;setTimeout(function(){self.textContent='Save analysis';},1500);});
+  document.getElementById('btn-kalshi').addEventListener('click',function(){var u=_url;if(u.indexOf('http')!==0)u='https://'+u;window.open(u,'_blank');});
+
+  function esc(s){var el=document.createElement('span');el.textContent=s||'';return el.innerHTML;}
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EdgeFinder — My Analyses</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#121116;--surface:#1C1C23;--surface-up:#252530;--border:#383845;
+--green:#38DA8C;--green-dim:#0D2418;--white:#EEEEF2;--mid:#8C8C96;
+--dim:#595966;--red:#F25454;--red-dim:#2A1010;--amber:#FABA2E;--amber-dim:#281E05;
+}
+html{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--white);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+body{min-height:100vh;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+
+/* NAV */
+.nav{height:56px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 40px;position:sticky;top:0;z-index:100}
+.nav-left{display:flex;align-items:center}
+.nav-logo{font-size:14px;font-weight:700;color:var(--green);letter-spacing:.5px}
+.nav-slash{color:var(--dim);font-size:11px;margin:0 10px;font-weight:500}
+.nav-sub{color:var(--dim);font-size:11px;font-weight:500;letter-spacing:.8px}
+.nav-right{display:flex;align-items:center;gap:28px}
+.nav-link{color:var(--mid);font-size:13px;font-weight:500;transition:color .15s}
+.nav-link:hover{color:var(--white)}
+.nav-login{color:var(--mid);font-size:13px;font-weight:500;padding:7px 16px;background:var(--surface-up);border:1px solid var(--border);border-radius:6px;transition:border-color .15s,color .15s}
+.nav-login:hover{border-color:var(--dim);color:var(--white)}
+.nav-signup{font-size:13px;font-weight:600;padding:7px 18px;background:var(--green);color:#0a0a0f;border-radius:6px;transition:opacity .15s}
+.nav-signup:hover{opacity:.88}
+
+/* PAGE HEADER */
+.page-header{height:64px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 72px}
+.ph-left{display:flex;align-items:baseline;gap:12px}
+.ph-title{font-size:16px;font-weight:700;color:var(--white)}
+.ph-count{font-size:12px;color:var(--dim)}
+.ph-btn{font-size:13px;font-weight:600;padding:8px 20px;background:var(--green);color:#0a0a0f;border-radius:8px;transition:opacity .15s}
+.ph-btn:hover{opacity:.88}
+
+/* FILTER BAR */
+.filter-bar{height:48px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 72px}
+.filters{display:flex;gap:8px}
+.filter-pill{height:32px;padding:0 16px;border-radius:16px;font-size:12px;font-weight:500;background:var(--surface-up);color:var(--mid);border:1px solid transparent;display:flex;align-items:center;transition:all .15s}
+.filter-pill:hover{color:var(--white);border-color:var(--border)}
+.filter-pill.active{background:var(--green);color:#0a0a0f;font-weight:600}
+.sort-btn{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--dim);background:var(--surface-up);border:1px solid var(--border);border-radius:6px;padding:6px 14px;transition:border-color .15s}
+.sort-btn:hover{border-color:var(--dim)}
+
+/* TABLE */
+.table-wrap{padding:0 72px}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{height:32px;font-size:11px;font-weight:600;color:var(--dim);text-align:left;letter-spacing:.6px;border-bottom:1px solid var(--border);padding:0 12px;white-space:nowrap}
+.tbl th:first-child{padding-left:16px}
+.tbl th:last-child{text-align:right;padding-right:16px}
+
+.tbl td{height:64px;font-size:13px;padding:0 12px;border-bottom:1px solid rgba(56,56,69,.4);vertical-align:middle}
+.tbl td:first-child{padding-left:16px}
+.tbl td:last-child{text-align:right;padding-right:16px}
+
+.tbl tr.even td{background:rgba(20,20,24,.6)}
+.tbl tbody tr{transition:background .1s}
+.tbl tbody tr:hover td{background:var(--surface-up)}
+
+/* resolved row left border */
+.tbl tbody tr.won td:first-child{box-shadow:inset 3px 0 0 var(--green)}
+.tbl tbody tr.lost td:first-child{box-shadow:inset 3px 0 0 var(--red)}
+
+/* cell styles */
+.cell-market{font-size:13px;font-weight:500;color:var(--white);max-width:380px}
+.cell-cat{font-size:10px;font-weight:600;letter-spacing:.6px;color:var(--mid)}
+.badge{display:inline-block;font-size:10px;font-weight:600;padding:4px 10px;border-radius:4px;letter-spacing:.3px;white-space:nowrap}
+.badge-edge{background:var(--green-dim);color:var(--green)}
+.badge-slight{background:var(--amber-dim);color:var(--amber)}
+.badge-none{background:var(--surface-up);color:var(--dim)}
+.cell-odds{font-size:13px;color:var(--mid);font-weight:500}
+.cell-model{font-size:13px;color:var(--white);font-weight:600}
+.cell-result{font-size:12px;font-weight:600}
+.result-pending{color:var(--dim)}
+.result-won{color:var(--green)}
+.result-lost{color:var(--red)}
+.cell-date{font-size:12px;color:var(--dim)}
+.cell-action a{font-size:12px;font-weight:600;color:var(--green);transition:all .15s;text-decoration:none}
+.cell-action a:hover{text-decoration:underline;text-underline-offset:3px}
+
+/* SUMMARY STATS */
+.stats-bar{height:72px;background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 72px;margin-top:auto}
+.stat-block{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative}
+.stat-block+.stat-block::before{content:'';position:absolute;left:0;top:14px;bottom:14px;width:1px;background:var(--border)}
+.stat-val{font-size:24px;font-weight:700}
+.stat-val.white{color:var(--white)}
+.stat-val.green{color:var(--green)}
+.stat-val.amber{color:var(--amber)}
+.stat-label{font-size:12px;color:var(--dim)}
+
+/* layout push stats to bottom */
+.page-body{display:flex;flex-direction:column;min-height:calc(100vh - 56px)}
+.table-wrap{flex:1}
+
+/* RESPONSIVE */
+@media(max-width:1200px){
+.page-header,.filter-bar,.table-wrap,.stats-bar{padding-left:32px;padding-right:32px}
+.table-wrap{overflow-x:auto}
+}
+@media(max-width:768px){
+.page-header,.filter-bar,.table-wrap,.stats-bar{padding-left:16px;padding-right:16px}
+.ph-left{flex-direction:column;gap:2px}
+.stats-bar{height:auto;flex-wrap:wrap;padding:16px}
+.stat-block{min-width:50%;padding:12px 0}
+.stat-block+.stat-block::before{display:none}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-left">
+    <a href="/" style="display:flex;align-items:center">
+      <span class="nav-logo">EDGEFINDER</span>
+    </a>
+    <span class="nav-slash">/</span>
+    <span class="nav-sub">KALSHI ANALYSIS</span>
+  </div>
+  <div class="nav-right">
+    <a href="index.html#markets" class="nav-link">Markets</a>
+    <a href="index.html#how" class="nav-link">How it works</a>
+  </div>
+</nav>
+
+<div class="page-body">
+
+<div class="page-header">
+  <div class="ph-left">
+    <span class="ph-title">MY ANALYSES</span>
+    <span class="ph-count" id="ph-count">0 saved analyses</span>
+  </div>
+  <button class="ph-btn">+ Analyze new market</button>
+</div>
+
+<div class="filter-bar">
+  <div class="filters">
+    <button class="filter-pill active" data-filter="all">All</button>
+    <button class="filter-pill" data-filter="edge">Edge found</button>
+    <button class="filter-pill" data-filter="noedge">No edge</button>
+    <button class="filter-pill" data-filter="resolved">Resolved</button>
+    <button class="filter-pill" data-filter="pending">Pending</button>
+  </div>
+  <button class="sort-btn">Sort: Most recent &darr;</button>
+</div>
+
+<div class="table-wrap">
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th style="width:380px">MARKET</th>
+        <th style="width:100px">CATEGORY</th>
+        <th style="width:130px">EDGE SIGNAL</th>
+        <th style="width:110px">MARKET ODDS</th>
+        <th style="width:110px">OUR MODEL</th>
+        <th style="width:110px">RESULT</th>
+        <th style="width:100px">DATE</th>
+        <th style="width:80px"></th>
+      </tr>
+    </thead>
+    <tbody id="history-tbody">
+    </tbody>
+  </table>
+</div>
+
+<div class="stats-bar" id="stats-bar">
+  <div class="stat-block">
+    <span class="stat-val white" id="stat-total">0</span>
+    <span class="stat-label">Analyses run</span>
+  </div>
+  <div class="stat-block">
+    <span class="stat-val green" id="stat-edges">0</span>
+    <span class="stat-label">Edges found</span>
+  </div>
+  <div class="stat-block">
+    <span class="stat-val green" id="stat-winrate">--</span>
+    <span class="stat-label">Win rate (resolved)</span>
+  </div>
+  <div class="stat-block">
+    <span class="stat-val amber" id="stat-gap">--</span>
+    <span class="stat-label">Avg model gap</span>
+  </div>
+</div>
+
+</div>
+
+<script>
+(function(){
+  var MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  function formatDate(iso){
+    var d=new Date(iso);
+    return MONTHS[d.getMonth()]+' '+d.getDate();
+  }
+
+  function escapeHtml(s){
+    var div=document.createElement('div');
+    div.appendChild(document.createTextNode(s));
+    return div.innerHTML;
+  }
+
+  function edgeClass(signal){
+    if(!signal) return 'badge-none';
+    var s=signal.toUpperCase();
+    if(s==='EDGE FOUND') return 'badge-edge';
+    if(s==='SLIGHT EDGE') return 'badge-slight';
+    return 'badge-none';
+  }
+
+  function loadHistory(){
+    try{
+      var raw=localStorage.getItem('edgefinder_history');
+      if(!raw) return [];
+      var arr=JSON.parse(raw);
+      return Array.isArray(arr)?arr:[];
+    }catch(e){ return []; }
+  }
+
+  var history=loadHistory();
+  // Sort most recent first
+  history.sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
+
+  var tbody=document.getElementById('history-tbody');
+  var countEl=document.getElementById('ph-count');
+
+  // Update header count
+  var total=history.length;
+  countEl.textContent=total+' saved analyse'+(total===1?'':'s');
+
+  if(total===0){
+    var emptyRow=document.createElement('tr');
+    var emptyTd=document.createElement('td');
+    emptyTd.setAttribute('colspan','8');
+    emptyTd.style.cssText='text-align:center;padding:64px 0;color:var(--dim);font-size:14px;';
+    emptyTd.innerHTML='No saved analyses yet. <a href="/" style="color:var(--green);text-decoration:underline;text-underline-offset:3px">Analyze a market</a> to get started.';
+    emptyRow.appendChild(emptyTd);
+    tbody.appendChild(emptyRow);
+  }
+
+  // Build rows
+  history.forEach(function(item,i){
+    var d=item.data||{};
+    var signal=d.edge_signal||'NO EDGE';
+    var badgeCls=edgeClass(signal);
+    var marketYes=d.market_yes_pct!=null?d.market_yes_pct:'--';
+    var modelYes=d.model_yes_pct!=null?d.model_yes_pct:'--';
+    var category=(d.category||'').toUpperCase();
+    var title=d.contract_title||item.url||'Untitled';
+
+    var tr=document.createElement('tr');
+    if(i%2===1) tr.classList.add('even');
+    tr.setAttribute('data-signal',badgeCls);
+
+    tr.innerHTML=
+      '<td class="cell-market">'+escapeHtml(title)+'</td>'+
+      '<td><span class="cell-cat">'+escapeHtml(category)+'</span></td>'+
+      '<td><span class="badge '+badgeCls+'">'+escapeHtml(signal.toUpperCase())+'</span></td>'+
+      '<td class="cell-odds">YES '+escapeHtml(String(marketYes))+'%</td>'+
+      '<td class="cell-model">'+escapeHtml(String(modelYes))+'%</td>'+
+      '<td class="cell-result result-pending">PENDING</td>'+
+      '<td class="cell-date">'+escapeHtml(formatDate(item.date))+'</td>'+
+      '<td class="cell-action"><a href="#" class="view-link">View &rarr;</a></td>';
+
+    // Attach click handler for "View"
+    (function(entry){
+      tr.querySelector('.view-link').addEventListener('click',function(e){
+        e.preventDefault();
+        localStorage.setItem('edgefinder_current',JSON.stringify(entry));
+        window.location.href='/analysis';
+      });
+    })(item);
+
+    tbody.appendChild(tr);
+  });
+
+  // Summary stats
+  var edgesFound=0;
+  var gapSum=0;
+  var gapCount=0;
+
+  history.forEach(function(item){
+    var d=item.data||{};
+    var signal=(d.edge_signal||'').toUpperCase();
+    if(signal==='EDGE FOUND') edgesFound++;
+    if(d.model_yes_pct!=null&&d.market_yes_pct!=null){
+      gapSum+=Math.abs(d.model_yes_pct-d.market_yes_pct);
+      gapCount++;
+    }
+  });
+
+  document.getElementById('stat-total').textContent=total;
+  document.getElementById('stat-edges').textContent=edgesFound;
+  // No resolution tracking, so win rate stays "--"
+  document.getElementById('stat-winrate').textContent='--';
+  if(gapCount>0){
+    var avg=(gapSum/gapCount).toFixed(1);
+    document.getElementById('stat-gap').textContent='+'+avg+'pts';
+  }
+
+  // Filter pill toggle
+  var pills=document.querySelectorAll('.filter-pill');
+  pills.forEach(function(p){
+    p.addEventListener('click',function(){
+      pills.forEach(function(x){x.classList.remove('active');});
+      p.classList.add('active');
+
+      var f=p.getAttribute('data-filter');
+      var rows=document.querySelectorAll('.tbl tbody tr');
+
+      rows.forEach(function(row){
+        var badge=row.querySelector('.badge');
+        var result=row.querySelector('.cell-result');
+        var show=true;
+
+        if(f==='edge'){
+          show=badge&&badge.classList.contains('badge-edge');
+        }else if(f==='noedge'){
+          show=badge&&(badge.classList.contains('badge-none')||badge.classList.contains('badge-slight'));
+        }else if(f==='resolved'){
+          show=row.classList.contains('won')||row.classList.contains('lost');
+        }else if(f==='pending'){
+          show=result&&result.classList.contains('result-pending');
+        }
+
+        row.style.display=show?'':'none';
+      });
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

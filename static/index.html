@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EdgeFinder — Kalshi Market Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#121116;--surface:#1C1C23;--surface-up:#252530;--border:#383845;
+--green:#38DA8C;--green-dim:#0D2418;--white:#EEEEF2;--mid:#8C8C96;
+--dim:#595966;--red:#F25454;--amber:#FABA2E;
+}
+html{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--white);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+body{min-height:100vh;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+
+/* NAV */
+.nav{height:56px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 40px;position:sticky;top:0;z-index:100}
+.nav-left{display:flex;align-items:center;gap:0}
+.nav-logo{font-size:14px;font-weight:700;color:var(--green);letter-spacing:.5px}
+.nav-slash{color:var(--dim);font-size:11px;margin:0 10px;font-weight:500}
+.nav-sub{color:var(--dim);font-size:11px;font-weight:500;letter-spacing:.8px}
+.nav-right{display:flex;align-items:center;gap:28px}
+.nav-link{color:var(--mid);font-size:13px;font-weight:500;transition:color .15s}
+.nav-link:hover{color:var(--white)}
+.nav-login{color:var(--mid);font-size:13px;font-weight:500;padding:7px 16px;background:var(--surface-up);border:1px solid var(--border);border-radius:6px;transition:border-color .15s,color .15s}
+.nav-login:hover{border-color:var(--dim);color:var(--white)}
+.nav-signup{font-size:13px;font-weight:600;padding:7px 18px;background:var(--green);color:#0a0a0f;border-radius:6px;transition:opacity .15s}
+.nav-signup:hover{opacity:.88}
+
+/* HERO */
+.hero{max-width:1440px;margin:0 auto;padding:80px 72px 64px;display:flex;gap:48px;align-items:flex-start}
+.hero-left{flex:1;min-width:0;padding-top:8px}
+.hero-right{width:508px;flex-shrink:0}
+
+.pill{display:inline-flex;align-items:center;gap:0;background:var(--green-dim);border:1px solid rgba(56,218,140,.12);border-radius:100px;padding:5px 14px;margin-bottom:28px}
+.pill span{font-size:11px;font-weight:600;color:var(--green);letter-spacing:.8px}
+.pill .dot{width:3px;height:3px;border-radius:50%;background:var(--green);opacity:.45;margin:0 8px}
+
+h1{font-size:64px;font-weight:700;line-height:1.04;letter-spacing:-.03em;color:var(--white);margin-bottom:24px;max-width:580px}
+h1 em{font-style:normal;color:var(--green)}
+
+.hero-body{font-size:16px;line-height:1.55;color:var(--mid);max-width:520px;margin-bottom:36px}
+
+.input-bar{display:flex;align-items:center;background:var(--surface-up);border:1px solid var(--border);border-radius:8px;width:560px;height:52px;padding:0 6px 0 18px;transition:border-color .2s}
+.input-bar:focus-within{border-color:var(--green)}
+.input-prompt{color:var(--green);font-size:14px;font-weight:600;margin-right:10px;user-select:none;font-family:'Inter',monospace}
+.input-bar input{flex:1;background:none;border:none;outline:none;color:var(--white);font-size:14px;font-family:inherit}
+.input-bar input::placeholder{color:var(--dim);font-size:14px}
+.input-btn{background:var(--green);color:#0a0a0f;font-size:13px;font-weight:600;padding:0 24px;height:40px;border-radius:6px;white-space:nowrap;transition:opacity .15s}
+.input-btn:hover{opacity:.88}
+.input-btn.loading{opacity:.7;pointer-events:none}
+@keyframes pulse{0%,100%{opacity:.7}50%{opacity:1}}
+.input-btn.loading{animation:pulse 1.4s ease-in-out infinite}
+.input-error{margin-top:10px;font-size:12px;color:var(--red);display:none}
+
+.input-sub{margin-top:12px;font-size:11px;color:var(--dim);letter-spacing:.3px}
+.input-sub .sep{margin:0 6px;opacity:.5}
+
+/* LIVE PANEL */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.panel-head{display:flex;align-items:center;padding:16px 20px;gap:8px}
+.panel-label{font-size:10px;font-weight:600;color:var(--green);letter-spacing:1px}
+.panel-dot{width:3px;height:3px;border-radius:50%;background:var(--dim)}
+.panel-time{font-size:10px;color:var(--dim);letter-spacing:.3px}
+.panel-divider{height:1px;background:var(--border)}
+
+.mkt-row{display:grid;grid-template-columns:1fr 180px auto auto;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid rgba(56,56,69,.5);transition:background .12s}
+.mkt-row:hover{background:rgba(255,255,255,.015)}
+.mkt-row:last-of-type{border-bottom:none}
+.mkt-q{font-size:12px;font-weight:500;color:var(--white);line-height:1.3}
+.mkt-bar-wrap{display:flex;align-items:center;gap:10px}
+.mkt-bar{width:100%;height:6px;background:rgba(255,255,255,.04);border-radius:3px;overflow:hidden}
+.mkt-bar-fill{height:100%;border-radius:3px;transition:width .6s ease}
+.mkt-bar-fill.green{background:var(--green)}
+.mkt-bar-fill.red{background:var(--red)}
+.mkt-pct{font-size:11px;font-weight:600;white-space:nowrap;min-width:56px}
+.mkt-pct.green{color:var(--green)}
+.mkt-pct.red{color:var(--red)}
+.mkt-vol{font-size:11px;color:var(--dim);text-align:right;min-width:44px}
+.mkt-trend{font-size:11px;font-weight:600;text-align:right;min-width:36px}
+.mkt-trend.green{color:var(--green)}
+.mkt-trend.red{color:var(--red)}
+
+.panel-footer{padding:14px 20px;border-top:1px solid var(--border)}
+.panel-footer a{font-size:11px;font-weight:500;color:var(--green);letter-spacing:.2px;transition:opacity .15s}
+.panel-footer a:hover{opacity:.75}
+
+/* DIVIDER */
+.divider{max-width:1440px;margin:0 auto;padding:0 72px}
+.divider-line{height:1px;background:var(--border)}
+
+/* HOW IT WORKS */
+.how{max-width:1440px;margin:0 auto;padding:72px 72px 80px}
+.how-label{font-size:10px;font-weight:600;color:var(--green);letter-spacing:1px;margin-bottom:44px}
+.how-grid{display:flex;gap:0}
+.how-step{flex:1;padding:0 36px}
+.how-step:first-child{padding-left:0}
+.how-step:last-child{padding-right:0}
+.how-step+.how-step{border-left:1px solid var(--border)}
+.how-num{font-size:42px;font-weight:700;color:var(--green);opacity:.4;letter-spacing:-.02em;margin-bottom:12px;line-height:1}
+.how-title{font-size:15px;font-weight:600;color:var(--white);margin-bottom:10px}
+.how-desc{font-size:13px;line-height:1.55;color:var(--mid)}
+
+/* BOTTOM CTA */
+.cta-bar{background:var(--surface);border-top:1px solid var(--border);padding:32px 72px;display:flex;align-items:center;justify-content:center;gap:24px}
+.cta-text{font-size:14px;color:var(--mid)}
+.cta-btn{font-size:13px;font-weight:600;padding:10px 22px;background:var(--green);color:#0a0a0f;border-radius:6px;transition:opacity .15s}
+.cta-btn:hover{opacity:.88}
+
+/* cursor blink */
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.cursor-blink{animation:blink 1.1s step-end infinite}
+
+/* subtle bar animation on load */
+@keyframes barIn{from{width:0}}
+.mkt-bar-fill{animation:barIn .8s ease-out both}
+.mkt-row:nth-child(2) .mkt-bar-fill{animation-delay:.08s}
+.mkt-row:nth-child(3) .mkt-bar-fill{animation-delay:.16s}
+.mkt-row:nth-child(4) .mkt-bar-fill{animation-delay:.24s}
+.mkt-row:nth-child(5) .mkt-bar-fill{animation-delay:.32s}
+
+/* responsive — not asked for but keeps it from breaking */
+@media(max-width:1100px){
+.hero{flex-direction:column;padding:48px 32px 40px}
+.hero-right{width:100%;max-width:560px}
+.input-bar{width:100%}
+h1{font-size:44px}
+.how{padding:48px 32px 56px}
+.cta-bar{padding:24px 32px}
+.divider{padding:0 32px}
+.nav{padding:0 24px}
+}
+@media(max-width:640px){
+h1{font-size:32px}
+.mkt-row{grid-template-columns:1fr auto auto;gap:8px}
+.mkt-bar-wrap{display:none}
+.how-grid{flex-direction:column;gap:32px}
+.how-step+.how-step{border-left:none;border-top:1px solid var(--border);padding-left:0;padding-top:24px}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-left">
+    <span class="nav-logo">EDGEFINDER</span>
+    <span class="nav-slash">/</span>
+    <span class="nav-sub">KALSHI ANALYSIS</span>
+  </div>
+  <div class="nav-right">
+    <a href="#markets" class="nav-link">Markets</a>
+    <a href="#how" class="nav-link">How it works</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-left">
+    <div class="pill">
+      <span>KALSHI API</span>
+      <span class="dot"></span>
+      <span>LIVE DATA</span>
+    </div>
+
+    <h1>The market is usually right.<br><em>Until it isn't.</em></h1>
+
+    <p class="hero-body">EdgeFinder pulls live Kalshi contracts, cross-references news and base rates, then tells you in plain English whether there's a real edge.</p>
+
+    <div class="input-bar">
+      <span class="input-prompt">&gt;<span class="cursor-blink">_</span></span>
+      <input type="text" placeholder="kalshi.com/markets/..." spellcheck="false" autocomplete="off">
+      <button class="input-btn">Find edge &rarr;</button>
+    </div>
+
+    <p class="input-sub">No account needed<span class="sep">&middot;</span>Free to use</p>
+    <p class="input-error" id="input-error"></p>
+  </div>
+
+  <div class="hero-right" id="markets">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-label">LIVE MARKETS</span>
+        <span class="panel-dot"></span>
+        <span class="panel-time" id="updated-time">updated 12s ago</span>
+      </div>
+      <div class="panel-divider"></div>
+
+      <div class="mkt-row">
+        <span class="mkt-q">Fed cuts rates in June</span>
+        <div class="mkt-bar-wrap">
+          <div class="mkt-bar"><div class="mkt-bar-fill green" style="width:67%"></div></div>
+          <span class="mkt-pct green">YES&nbsp;&nbsp;67%</span>
+        </div>
+        <span class="mkt-vol">$2.1M</span>
+        <span class="mkt-trend green">+4%</span>
+      </div>
+      <div class="mkt-row">
+        <span class="mkt-q">S&amp;P 500 above 5800 EOW</span>
+        <div class="mkt-bar-wrap">
+          <div class="mkt-bar"><div class="mkt-bar-fill red" style="width:44%"></div></div>
+          <span class="mkt-pct red">YES&nbsp;&nbsp;44%</span>
+        </div>
+        <span class="mkt-vol">$890K</span>
+        <span class="mkt-trend red">&minus;2%</span>
+      </div>
+      <div class="mkt-row">
+        <span class="mkt-q">CPI above 3.2% in May</span>
+        <div class="mkt-bar-wrap">
+          <div class="mkt-bar"><div class="mkt-bar-fill green" style="width:38%"></div></div>
+          <span class="mkt-pct green">YES&nbsp;&nbsp;38%</span>
+        </div>
+        <span class="mkt-vol">$1.4M</span>
+        <span class="mkt-trend green">+1%</span>
+      </div>
+      <div class="mkt-row">
+        <span class="mkt-q">US recession in 2025</span>
+        <div class="mkt-bar-wrap">
+          <div class="mkt-bar"><div class="mkt-bar-fill red" style="width:29%"></div></div>
+          <span class="mkt-pct red">YES&nbsp;&nbsp;29%</span>
+        </div>
+        <span class="mkt-vol">$3.6M</span>
+        <span class="mkt-trend red">&minus;6%</span>
+      </div>
+      <div class="mkt-row">
+        <span class="mkt-q">Bitcoin above $100k by Aug</span>
+        <div class="mkt-bar-wrap">
+          <div class="mkt-bar"><div class="mkt-bar-fill green" style="width:52%"></div></div>
+          <span class="mkt-pct green">YES&nbsp;&nbsp;52%</span>
+        </div>
+        <span class="mkt-vol">$5.2M</span>
+        <span class="mkt-trend green">+9%</span>
+      </div>
+
+      <div class="panel-footer">
+        <a href="https://kalshi.com/markets" target="_blank">View all markets on Kalshi &rarr;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"><div class="divider-line"></div></div>
+
+<section class="how" id="how">
+  <div class="how-label">HOW IT WORKS</div>
+  <div class="how-grid">
+    <div class="how-step">
+      <div class="how-num">01</div>
+      <div class="how-title">Paste a Kalshi URL</div>
+      <p class="how-desc">Drop any Kalshi market link into the search bar. We parse the contract, pull the latest order book, and snapshot the current price.</p>
+    </div>
+    <div class="how-step">
+      <div class="how-num">02</div>
+      <div class="how-title">We run the analysis</div>
+      <p class="how-desc">Our engine cross-references the contract against recent news, historical base rates, and polling data to estimate the true implied probability.</p>
+    </div>
+    <div class="how-step">
+      <div class="how-num">03</div>
+      <div class="how-title">You get the edge</div>
+      <p class="how-desc">See a plain-English breakdown of where the market price diverges from fundamentals, along with a confidence score and supporting evidence.</p>
+    </div>
+  </div>
+</section>
+
+<div class="divider"><div class="divider-line"></div></div>
+
+<div class="cta-bar">
+  <span class="cta-text">Start finding edges in 30 seconds.</span>
+  <button class="cta-btn">Try it free &rarr;</button>
+</div>
+
+<script>
+// Tick the "updated Xs ago" timer
+(function(){
+  var t=12,el=document.getElementById('updated-time');
+  setInterval(function(){t++;el.textContent='updated '+t+'s ago';},1000);
+})();
+
+// Smooth scroll for nav links
+document.querySelectorAll('a[href^="#"]').forEach(function(a){
+  a.addEventListener('click',function(e){
+    var target=document.querySelector(this.getAttribute('href'));
+    if(target){e.preventDefault();target.scrollIntoView({behavior:'smooth',block:'start'});}
+  });
+});
+
+// Analyze flow
+(function(){
+  var input=document.querySelector('.input-bar input');
+  var btn=document.querySelector('.input-btn');
+  var errEl=document.getElementById('input-error');
+
+  function showError(msg){
+    errEl.textContent=msg;errEl.style.display='block';
+    setTimeout(function(){errEl.style.display='none';},5000);
+  }
+
+  function doAnalyze(){
+    var url=input.value.trim();
+    if(!url){showError('Paste a Kalshi market URL to get started.');return;}
+
+    btn.textContent='Analyzing\u2026';
+    btn.classList.add('loading');
+    errEl.style.display='none';
+
+    fetch('/analyze',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({url:url})
+    })
+    .then(function(r){return r.json();})
+    .then(function(res){
+      if(!res.success){
+        btn.textContent='Find edge \u2192';btn.classList.remove('loading');
+        showError(res.error||'Analysis failed. Try again.');
+        return;
+      }
+      localStorage.setItem('edgefinder_result',JSON.stringify(res.data));
+      localStorage.setItem('edgefinder_url',url);
+      window.location.href='/analysis?url='+encodeURIComponent(url);
+    })
+    .catch(function(){
+      btn.textContent='Find edge \u2192';btn.classList.remove('loading');
+      showError('Network error. Make sure the server is running.');
+    });
+  }
+
+  btn.addEventListener('click',doAnalyze);
+  input.addEventListener('keydown',function(e){
+    if(e.key==='Enter')doAnalyze();
+  });
+})();
+</script>
+
+</body>
+</html>
