@@ -9,7 +9,9 @@ Architecture:
 """
 
 import json
+import re
 import time
+from datetime import datetime, timezone
 from anthropic import Anthropic
 from ddgs import DDGS
 
@@ -17,6 +19,128 @@ client = Anthropic()
 
 HAIKU_MODEL = 'claude-haiku-4-5-20251001'
 SONNET_MODEL = 'claude-sonnet-4-20250514'
+
+
+# ---------------------------------------------------------------------------
+# Market Classification
+# ---------------------------------------------------------------------------
+
+def classify_market(kalshi_data, siblings, option_name=''):
+    """Detect market type to configure the agent pipeline.
+
+    Returns a profile dict with:
+      timeframe: flash/short/medium/long
+      structure: binary/range_bucket/above_below/candidate
+      category: from Kalshi API
+      skip_contrarian: bool
+      skip_cross_market: bool
+      needs_current_price: bool
+      current_price: float or None (estimated from sibling distribution)
+    """
+    now = datetime.now(timezone.utc)
+    category = (kalshi_data or {}).get('category', 'MARKETS') or 'MARKETS'
+
+    # --- Timeframe ---
+    timeframe = 'long'
+    close_time = (kalshi_data or {}).get('close_time', '')
+    if close_time:
+        try:
+            close_dt = datetime.fromisoformat(close_time.replace('Z', '+00:00'))
+            delta = close_dt - now
+            hours = delta.total_seconds() / 3600
+            if hours <= 4:
+                timeframe = 'flash'
+            elif hours <= 7 * 24:
+                timeframe = 'short'
+            elif hours <= 90 * 24:
+                timeframe = 'medium'
+        except Exception:
+            pass
+
+    # --- Structure ---
+    is_multi = siblings and len(siblings) > 1
+    structure = 'binary'
+    if is_multi and option_name:
+        name_lower = option_name.lower()
+        # Detect above/below: "$80,800 or above", "72,000 or below", "or above", "or below"
+        if 'or above' in name_lower or 'or below' in name_lower or 'or more' in name_lower or 'or less' in name_lower:
+            structure = 'above_below'
+        # Detect numeric ranges: "70,000 to 74,999.99", "0.2% to 0.3%"
+        elif re.search(r'\d.*to\s+\d', name_lower):
+            structure = 'range_bucket'
+        # Detect "at least X" patterns (e.g., "At least 95 days")
+        elif 'at least' in name_lower:
+            structure = 'above_below'
+        else:
+            # Named candidates/options
+            structure = 'candidate'
+    elif is_multi:
+        structure = 'range_bucket'  # multi-outcome without clear option name
+
+    # --- Needs current price? ---
+    price_categories = {'CRYPTO', 'MARKETS'}
+    price_structures = {'above_below', 'range_bucket'}
+    needs_current_price = category in price_categories and structure in price_structures
+
+    # --- Estimate current price from sibling distribution ---
+    current_price = None
+    if needs_current_price and siblings:
+        current_price = _estimate_current_price(siblings)
+
+    # --- Agent skip logic ---
+    skip_contrarian = timeframe == 'flash'
+    skip_cross_market = timeframe in ('flash', 'short')
+
+    return {
+        'timeframe': timeframe,
+        'structure': structure,
+        'category': category,
+        'needs_current_price': needs_current_price,
+        'current_price': current_price,
+        'skip_contrarian': skip_contrarian,
+        'skip_cross_market': skip_cross_market,
+    }
+
+
+def _estimate_current_price(siblings):
+    """Estimate the current underlying price from the sibling distribution.
+
+    For above/below markets, find the contract closest to 50% — that threshold
+    is approximately the current price. For range buckets, find the highest-
+    probability bucket's midpoint.
+    """
+    best_contract = None
+    best_distance = 100
+
+    for s in siblings:
+        try:
+            pct = float(s.get('last_price', '0') or '0') * 100
+        except (ValueError, TypeError):
+            continue
+
+        name = s.get('option_name', '') or s.get('title', '')
+        distance = abs(pct - 50)
+
+        if distance < best_distance:
+            best_distance = distance
+            best_contract = name
+
+    if not best_contract:
+        return None
+
+    # Extract a number from the contract name
+    # e.g., "$72,000 or above" → 72000, "70,000 to 74,999.99" → 72500
+    numbers = re.findall(r'[\d,]+\.?\d*', best_contract.replace(',', ''))
+    if not numbers:
+        return None
+
+    try:
+        nums = [float(n) for n in numbers]
+        if len(nums) >= 2:
+            return round((nums[0] + nums[1]) / 2, 2)  # midpoint of range
+        return nums[0]
+    except (ValueError, IndexError):
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -363,10 +487,95 @@ Respond ONLY with JSON:
 
 
 # ---------------------------------------------------------------------------
+# Synthesis Rules Builder
+# ---------------------------------------------------------------------------
+
+def _build_synthesis_rules(profile):
+    """Build context-specific rules for the synthesis prompt based on market profile."""
+    if not profile:
+        profile = {}
+
+    rules = ['CRITICAL RULES:']
+    timeframe = profile.get('timeframe', 'long')
+    structure = profile.get('structure', 'binary')
+
+    # Timeframe rules
+    if timeframe == 'flash':
+        rules.append(
+            '1. TIMEFRAME: This market closes in HOURS. Only immediate factors matter. '
+            'Large price moves are nearly impossible in this window. If the outcome requires '
+            'a >5% move, probability should be <3%. If >10% move needed, probability should be <1%.'
+        )
+    elif timeframe == 'short':
+        rules.append(
+            '1. TIMEFRAME: This market closes in DAYS. Focus on near-term catalysts only. '
+            'Discount long-term forecasts heavily. If a large move is needed in days, '
+            'probability should be very low unless there is an imminent catalyst.'
+        )
+    elif timeframe == 'medium':
+        rules.append(
+            '1. TIMEFRAME: This market closes in weeks/months. Balance near-term catalysts '
+            'with medium-term trends. Long-term forecasts have limited relevance.'
+        )
+    else:
+        rules.append(
+            '1. TIMEFRAME: This market has a long time horizon. Full analysis applies. '
+            'Weight long-term trends, structural factors, and base rates.'
+        )
+
+    # Structure rules
+    if structure == 'above_below':
+        rules.append(
+            '2. STRUCTURE: This is a THRESHOLD contract (above/below a specific level). '
+            'Estimate the probability the value will cross the stated threshold. '
+            'If a CURRENT PRICE is mentioned, calculate how far the threshold is from current '
+            'price and factor in typical volatility for the timeframe.'
+        )
+    elif structure == 'range_bucket':
+        rules.append(
+            '2. STRUCTURE: This is ONE RANGE BUCKET in a multi-outcome market. '
+            'Estimate probability the value falls in THIS EXACT RANGE — not above or below it. '
+            'Consider the full distribution of outcomes. A single bucket rarely exceeds 15-25%.'
+        )
+    elif structure == 'candidate':
+        rules.append(
+            '2. STRUCTURE: This is one CANDIDATE/OPTION among competitors. '
+            'Estimate this specific option\'s win probability relative to all competitors.'
+        )
+    else:
+        rules.append(
+            '2. STRUCTURE: This is a simple binary YES/NO question. '
+            'Estimate the probability of YES.'
+        )
+
+    # Current price rule (for price-based markets)
+    if profile.get('current_price'):
+        rules.append(
+            f'3. CURRENT PRICE: The underlying asset is currently at ~{profile["current_price"]:,.0f}. '
+            f'Use this as your anchor. Calculate the percentage move required to reach the target.'
+        )
+    else:
+        rules.append(
+            '3. If the question mentions current prices or levels, use them as your anchor.'
+        )
+
+    # Platform assumption rule
+    rules.append(
+        '4. PLATFORM CONTEXT: Kalshi only creates markets for CONFIRMED or SCHEDULED events. '
+        'If the question asks about what someone will SAY or DO during an event (speech, podcast, '
+        'earnings call, press conference), assume the event IS happening. The question is about '
+        'the CONTENT of the event, not whether the event occurs. Do NOT discount probability '
+        'based on "no confirmation the event will happen" — it will happen.'
+    )
+
+    return '\n'.join(rules)
+
+
+# ---------------------------------------------------------------------------
 # Synthesis Engine — combines all agent reports WITHOUT market price
 # ---------------------------------------------------------------------------
 
-def synthesize_reports(question, category, reports):
+def synthesize_reports(question, category, reports, profile=None):
     """Combine all agent reports into an independent probability estimate.
 
     CRITICAL: This function does NOT receive the market price.
@@ -410,22 +619,22 @@ IMPORTANT: You must estimate the TRUE probability of this event based ONLY on th
 You do NOT know what the market price is. Do NOT guess or reference any market price.
 Think like a superforecaster: decompose the question, weigh the evidence, consider base rates, and account for contrarian factors.
 
-CRITICAL: Pay close attention to whether this is a SPECIFIC BUCKET/RANGE in a multi-outcome market.
-If the question mentions "Specific contract:" or "ONE bucket in a multi-outcome market", you are
-estimating the probability of that EXACT range/option — NOT whether the value will be above/below a
-threshold. For example, if forecasts cluster around $90k, a $70k-$75k bucket should get a LOW
-probability (maybe 5-15%), not a high one. Use the full distribution context if provided.
+{_build_synthesis_rules(profile)}
 
 EVIDENCE FROM RESEARCH AGENTS:
 {evidence_block}
 
-Based on ALL the evidence above, provide your independent probability estimate.
+Based on ALL the evidence above, estimate the probability that the answer to the QUESTION is YES.
+
+IMPORTANT: "model_probability" must be the chance of YES happening (0 = definitely won't happen,
+100 = definitely will happen). If something is nearly impossible, use 1-3. If very unlikely, use 5-15.
+Make sure your number MATCHES your reasoning — if you say "nearly impossible", don't output 40.
 
 Respond ONLY with JSON:
 {{
-  "model_probability": <integer 0-100, your best estimate of TRUE probability>,
+  "model_probability": <integer 0-100, probability of YES>,
   "confidence": "High or Medium or Low",
-  "reasoning": "2-3 sentence explanation of your probability estimate, citing specific evidence",
+  "reasoning": "2-3 sentence explanation citing specific evidence",
   "key_factors": [
     {{"factor": "short description", "direction": "supports_yes or supports_no or neutral", "weight": "high or medium or low"}},
     ...
@@ -488,7 +697,13 @@ def score_edge(synthesis, market_data, category):
         model_pct = market_pct
 
     gap = abs(model_pct - market_pct)
-    thresholds = CATEGORY_THRESHOLDS.get(category, DEFAULT_THRESHOLDS)
+    thresholds = dict(CATEGORY_THRESHOLDS.get(category, DEFAULT_THRESHOLDS))
+
+    # High-volume markets are more efficient — raise the bar
+    volume = (market_data or {}).get('volume', 0) or 0
+    if volume > 10000:
+        thresholds['edge'] += 2
+        thresholds['slight'] += 1
 
     if synthesis_failed:
         edge_signal = 'NO EDGE'
@@ -556,20 +771,24 @@ def score_edge(synthesis, market_data, category):
 # ---------------------------------------------------------------------------
 
 def run_deep_analysis(question, category, market_data=None, siblings=None,
-                      option_name='', on_progress=None):
-    """Run all 4 research agents in parallel, synthesize, and score.
+                      option_name='', profile=None, on_progress=None):
+    """Run research agents, synthesize, and score.
 
     Args:
-        question: The market question (cleaned title)
+        question: The market question (with context appended by orchestrator)
         category: Market category (POLITICS, ECONOMICS, etc.)
         market_data: Parsed Kalshi market data dict
         siblings: List of sibling markets for multi-outcome
         option_name: For multi-outcome markets, the specific option name
+        profile: Market classification dict from classify_market()
         on_progress: Optional callback(agent_name, status) for progress updates
 
     Returns:
         Final analysis dict matching the existing frontend format
     """
+    if not profile:
+        profile = classify_market(market_data, siblings, option_name)
+
     def _progress(agent, status):
         if on_progress:
             try:
@@ -577,20 +796,20 @@ def run_deep_analysis(question, category, market_data=None, siblings=None,
             except Exception:
                 pass
 
-    # Phase 1: Dispatch all agents in parallel
-    reports = {}
+    # Phase 1: Select agents based on market profile
     agent_fns = {
         'news_researcher': agent_news_researcher,
         'data_researcher': agent_data_researcher,
-        'cross_market': agent_cross_market,
-        'contrarian': agent_contrarian,
     }
+    # Only add cross_market and contrarian when useful
+    if not profile.get('skip_cross_market'):
+        agent_fns['cross_market'] = agent_cross_market
+    if not profile.get('skip_contrarian'):
+        agent_fns['contrarian'] = agent_contrarian
 
     _progress('orchestrator', 'dispatching_agents')
 
-    # Run agents sequentially — DDGS is not thread-safe and deadlocks
-    # in ThreadPoolExecutor. Sequential is still fast since each agent
-    # only does 1-2 searches now.
+    reports = {}
     for name, fn in agent_fns.items():
         _progress(name, 'started')
         try:
@@ -603,7 +822,7 @@ def run_deep_analysis(question, category, market_data=None, siblings=None,
 
     # Phase 2: Synthesize (without market price)
     _progress('synthesizer', 'started')
-    synthesis = synthesize_reports(question, category, reports)
+    synthesis = synthesize_reports(question, category, reports, profile)
     _progress('synthesizer', 'completed')
 
     # Phase 3: Score edge (now we compare to market)

@@ -33,7 +33,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 .breadcrumb{height:32px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 40px;font-size:11px}
 .bread-back{color:var(--dim);display:flex;align-items:center;gap:6px;transition:color .15s}
 .bread-back:hover{color:var(--mid)}
-.bread-url{color:var(--mid);font-family:'Courier New',monospace;font-size:12px;letter-spacing:.3px}
+.bread-url{color:var(--mid);font-family:'Courier New',monospace;font-size:12px;letter-spacing:.3px;max-width:500px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bread-time{color:var(--dim)}
 .main{max-width:1440px;margin:0 auto;padding:24px 72px 64px;display:flex;gap:24px;align-items:flex-start}
 .col-left{width:740px;flex-shrink:0;display:flex;flex-direction:column;gap:12px}
@@ -180,7 +180,7 @@ if (!_raw) { window.location.replace('/'); }
   document.body.innerHTML = ''
   +'<nav class="nav"><div class="nav-left"><a href="/" style="display:flex;align-items:center"><span class="nav-logo">EDGEFINDER</span></a><span class="nav-slash">/</span><span class="nav-sub">KALSHI ANALYSIS</span></div><div class="nav-right"><a href="/#markets" class="nav-link">Markets</a><a href="/#how" class="nav-link">How it works</a></div></nav>'
 
-  +'<div class="breadcrumb"><a href="/" class="bread-back">\u2190 Back to markets</a><span class="bread-url">'+esc(_url)+'</span><span class="bread-time" id="bread-time">Last analyzed: just now</span></div>'
+  +'<div class="breadcrumb"><a href="/" class="bread-back">\u2190 Back to markets</a><span class="bread-url">'+esc(_url.length>60?_url.substring(0,60)+'\u2026':_url)+'</span><span class="bread-time" id="bread-time">Last analyzed: just now</span></div>'
 
   +'<div class="main"><div class="col-left">'
 

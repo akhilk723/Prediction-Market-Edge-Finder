@@ -1,13 +1,14 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from anthropic import Anthropic
+from datetime import datetime, timezone
 import os
 import json
 import re
 import requests as http_requests
 from ddgs import DDGS
 from dotenv import load_dotenv
-from agents import run_deep_analysis
+from agents import run_deep_analysis, classify_market
 
 load_dotenv()
 
@@ -220,6 +221,26 @@ def build_prompt(url, kalshi_data, siblings, news, web_results):
 
     sections.append(f'You are EdgeFinder, a prediction market analysis tool. A user submitted this Kalshi URL: {url}')
 
+    # Add temporal context so the model knows the current date and market timeframe
+    now = datetime.now(timezone.utc)
+    sections.append(f'\nTODAY IS: {now.strftime("%B %d, %Y %H:%M UTC")}.')
+    close_time = (kalshi_data or {}).get('close_time', '')
+    if close_time:
+        try:
+            close_dt = datetime.fromisoformat(close_time.replace('Z', '+00:00'))
+            delta = close_dt - now
+            total_hours = delta.total_seconds() / 3600
+            if total_hours <= 4:
+                sections.append(f'CRITICAL: Market CLOSES IN {int(total_hours)} HOURS. Extreme price moves are nearly impossible in this window.')
+            elif total_hours <= 24:
+                sections.append(f'Market closes in {int(total_hours)} hours. This is a very short-term market.')
+            elif delta.days <= 7:
+                sections.append(f'Market closes in {delta.days} days. This is a short-term market.')
+            else:
+                sections.append(f'Market closes on {close_dt.strftime("%B %d, %Y")} ({delta.days} days).')
+        except Exception:
+            pass
+
     is_multi = len(siblings) > 1
 
     if kalshi_data:
@@ -414,18 +435,38 @@ def analyze():
             category = (kalshi_data or {}).get('category', 'MARKETS') or 'MARKETS'
             question = raw_title or search_query
 
-            # For multi-outcome markets (ranges, candidates, etc.), build a precise
-            # question so agents understand the SPECIFIC contract, not just the
-            # parent market.  e.g. "BTC price on Jan 1, 2027?" with option_name
-            # "70,000 to 74,999.99" becomes:
-            # "Will BTC price be 70,000 to 74,999.99 on Jan 1, 2027?"
+            # Classify the market to configure the pipeline
+            profile = classify_market(kalshi_data, siblings, option_name)
+
+            # Build precise question with all necessary context
             is_multi = siblings and len(siblings) > 1
             precise_question = question
+
+            # Add temporal context — critical for short-term markets
+            now = datetime.now(timezone.utc)
+            close_time = (kalshi_data or {}).get('close_time', '')
+            time_context = f'\n\nTODAY IS: {now.strftime("%B %d, %Y %H:%M UTC")}.'
+            if close_time:
+                try:
+                    close_dt = datetime.fromisoformat(close_time.replace('Z', '+00:00'))
+                    delta = close_dt - now
+                    total_hours = delta.total_seconds() / 3600
+                    days = delta.days
+                    hours = int(total_hours) % 24
+                    if total_hours <= 4:
+                        time_context += f' Market CLOSES IN {int(total_hours)} HOURS. This is a FLASH market — extreme moves are nearly impossible.'
+                    elif days <= 0:
+                        time_context += f' Market CLOSES IN {int(total_hours)} HOURS (today/tomorrow). This is an EXTREMELY short timeframe.'
+                    elif days <= 7:
+                        time_context += f' Market closes in {days} days and {hours} hours. This is a SHORT-TERM market.'
+                    else:
+                        time_context += f' Market closes in {days} days ({close_dt.strftime("%B %d, %Y")}).'
+                except Exception:
+                    pass
+
+            # For multi-outcome markets, add specific contract + distribution
             if is_multi and option_name:
-                # Include the option name directly in the question
                 precise_question = f'{question} — Specific contract: {option_name}'
-                # Also give the full distribution context so the model
-                # understands this is one bucket among many
                 sibling_summary = []
                 for s in sorted(siblings,
                                 key=lambda x: float(x.get('last_price', '0') or '0'),
@@ -443,12 +484,24 @@ def analyze():
                         f'Full distribution: {"; ".join(sibling_summary)}'
                     )
 
+            # Add current price for price-based markets
+            if profile.get('current_price'):
+                precise_question += f'\n\nCURRENT PRICE: ~${profile["current_price"]:,.0f}'
+
+            # Add settlement rules for context
+            rules_text = (kalshi_data or {}).get('rules', '')
+            if rules_text:
+                precise_question += f'\n\nSETTLEMENT RULES: {rules_text[:300]}'
+
+            precise_question += time_context
+
             data = run_deep_analysis(
                 question=precise_question,
                 category=category,
                 market_data=kalshi_data,
                 siblings=siblings,
                 option_name=option_name,
+                profile=profile,
             )
 
             data['similar_markets'] = _build_similar_markets(siblings, market_ticker)
@@ -464,6 +517,11 @@ def analyze():
                 'event_ticker': event_ticker,
                 'sibling_count': len(siblings),
                 'mode': 'deep',
+                'market_profile': {
+                    'timeframe': profile['timeframe'],
+                    'structure': profile['structure'],
+                    'current_price': profile.get('current_price'),
+                },
                 'agents': agents_meta,
             }
 

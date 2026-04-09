@@ -46,12 +46,12 @@ h1 em{font-style:normal;color:var(--green)}
 
 .hero-body{font-size:16px;line-height:1.55;color:var(--mid);max-width:520px;margin-bottom:36px}
 
-.input-bar{display:flex;align-items:center;background:var(--surface-up);border:1px solid var(--border);border-radius:8px;width:560px;height:52px;padding:0 6px 0 18px;transition:border-color .2s}
+.input-bar{display:flex;align-items:center;background:var(--surface-up);border:1px solid var(--border);border-radius:8px;width:100%;max-width:600px;height:52px;padding:0 6px 0 18px;transition:border-color .2s}
 .input-bar:focus-within{border-color:var(--green)}
-.input-prompt{color:var(--green);font-size:14px;font-weight:600;margin-right:10px;user-select:none;font-family:'Inter',monospace}
-.input-bar input{flex:1;background:none;border:none;outline:none;color:var(--white);font-size:14px;font-family:inherit}
+.input-prompt{color:var(--green);font-size:14px;font-weight:600;margin-right:10px;user-select:none;font-family:'Inter',monospace;flex-shrink:0}
+.input-bar input{flex:1;min-width:0;width:0;background:none;border:none;outline:none;color:var(--white);font-size:14px;font-family:inherit}
 .input-bar input::placeholder{color:var(--dim);font-size:14px}
-.input-btn{background:var(--green);color:#0a0a0f;font-size:13px;font-weight:600;padding:0 24px;height:40px;border-radius:6px;white-space:nowrap;transition:opacity .15s}
+.input-btn{background:var(--green);color:#0a0a0f;font-size:13px;font-weight:600;padding:0 24px;height:40px;border-radius:6px;white-space:nowrap;transition:opacity .15s;flex-shrink:0}
 .input-btn:hover{opacity:.88}
 .input-btn.loading{opacity:.7;pointer-events:none}
 @keyframes pulse{0%,100%{opacity:.7}50%{opacity:1}}
