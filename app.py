@@ -7,6 +7,7 @@ import re
 import requests as http_requests
 from ddgs import DDGS
 from dotenv import load_dotenv
+from agents import run_deep_analysis
 
 load_dotenv()
 
@@ -339,22 +340,14 @@ def history():
     return app.send_static_file('history.html')
 
 
-@app.route('/analyze', methods=['POST'])
-def analyze():
-    body = request.get_json(silent=True)
-    if not body or not body.get('url'):
-        return jsonify({'success': False, 'error': 'Missing url parameter'}), 400
-
-    url = body['url'].strip()
-
-    # 1. Extract tickers and fetch real market data
+def _fetch_market_context(url):
+    """Shared logic: extract tickers, fetch market data, resolve multi-outcome."""
     market_ticker, event_ticker = extract_tickers(url)
     kalshi_data, siblings = fetch_kalshi_market(market_ticker, event_ticker)
 
     # For multi-outcome markets, use the TOP candidate as the focal market
     if siblings and len(siblings) > 1:
         top = max(siblings, key=lambda x: float(x.get('last_price', '0') or '0'))
-        # If our specific ticker is a low-probability sub-market, switch to the leader
         if kalshi_data:
             try:
                 our_pct = float(kalshi_data.get('last_price', '0') or '0')
@@ -366,7 +359,7 @@ def analyze():
         else:
             kalshi_data = top
 
-    # 2. Build a search query from the market title or URL
+    # Build search query
     raw_title = ''
     option_name = ''
     if kalshi_data and kalshi_data.get('title'):
@@ -379,15 +372,109 @@ def analyze():
     if raw_title:
         search_query = simplify_search_query(raw_title, option_name)
     else:
-        # Derive query from URL slug
         slug = market_ticker.lower().replace('-', ' ').replace('kx', '')
         search_query = slug
 
-    # 3. Fetch news and web results
+    return market_ticker, event_ticker, kalshi_data, siblings, raw_title, option_name, search_query
+
+
+def _build_similar_markets(siblings, market_ticker):
+    """Build similar markets list from siblings."""
+    similar = []
+    for sib in siblings:
+        if sib.get('ticker', '').upper() == market_ticker.upper():
+            continue
+        try:
+            yes_pct = int(round(float(sib.get('last_price', '0') or '0') * 100))
+        except (ValueError, TypeError):
+            yes_pct = 0
+        has_edge = abs(yes_pct - 50) > 8
+        name = sib.get('option_name', '') or sib.get('title', 'Unknown')
+        similar.append({'name': name, 'yes_pct': yes_pct, 'has_edge': has_edge})
+        if len(similar) >= 3:
+            break
+    return similar
+
+
+@app.route('/analyze', methods=['POST'])
+def analyze():
+    body = request.get_json(silent=True)
+    if not body or not body.get('url'):
+        return jsonify({'success': False, 'error': 'Missing url parameter'}), 400
+
+    url = body['url'].strip()
+    mode = body.get('mode', 'quick')  # "quick" (legacy) or "deep" (agent-powered)
+
+    market_ticker, event_ticker, kalshi_data, siblings, raw_title, option_name, search_query = \
+        _fetch_market_context(url)
+
+    # --- DEEP MODE: agent-based analysis ---
+    if mode == 'deep':
+        try:
+            category = (kalshi_data or {}).get('category', 'MARKETS') or 'MARKETS'
+            question = raw_title or search_query
+
+            # For multi-outcome markets (ranges, candidates, etc.), build a precise
+            # question so agents understand the SPECIFIC contract, not just the
+            # parent market.  e.g. "BTC price on Jan 1, 2027?" with option_name
+            # "70,000 to 74,999.99" becomes:
+            # "Will BTC price be 70,000 to 74,999.99 on Jan 1, 2027?"
+            is_multi = siblings and len(siblings) > 1
+            precise_question = question
+            if is_multi and option_name:
+                # Include the option name directly in the question
+                precise_question = f'{question} — Specific contract: {option_name}'
+                # Also give the full distribution context so the model
+                # understands this is one bucket among many
+                sibling_summary = []
+                for s in sorted(siblings,
+                                key=lambda x: float(x.get('last_price', '0') or '0'),
+                                reverse=True)[:10]:
+                    try:
+                        sp = str(round(float(s.get('last_price', '0')) * 100))
+                    except (ValueError, TypeError):
+                        sp = '?'
+                    sname = s.get('option_name', '') or s.get('title', '')
+                    if sname:
+                        sibling_summary.append(f'{sname}: {sp}%')
+                if sibling_summary:
+                    precise_question += (
+                        f'\n\nThis is ONE bucket in a multi-outcome market. '
+                        f'Full distribution: {"; ".join(sibling_summary)}'
+                    )
+
+            data = run_deep_analysis(
+                question=precise_question,
+                category=category,
+                market_data=kalshi_data,
+                siblings=siblings,
+                option_name=option_name,
+            )
+
+            data['similar_markets'] = _build_similar_markets(siblings, market_ticker)
+
+            # Attach source metadata (compatible with existing frontend)
+            agents_meta = data.get('_agents', {})
+            news_agent = agents_meta.get('news_researcher', {})
+            data['_sources'] = {
+                'kalshi_live': kalshi_data is not None,
+                'news_count': news_agent.get('news_count', 0),
+                'web_count': news_agent.get('web_count', 0),
+                'ticker': market_ticker,
+                'event_ticker': event_ticker,
+                'sibling_count': len(siblings),
+                'mode': 'deep',
+                'agents': agents_meta,
+            }
+
+            return jsonify({'success': True, 'data': data})
+
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    # --- QUICK MODE: legacy single-call analysis ---
     news = search_news(search_query)
     web_results = search_web(search_query + ' prediction forecast')
-
-    # 4. Build enriched prompt and call Claude
     prompt = build_prompt(url, kalshi_data, siblings, news, web_results)
 
     try:
@@ -411,28 +498,8 @@ def analyze():
             raw = raw.strip()
 
         data = json.loads(raw)
+        data['similar_markets'] = _build_similar_markets(siblings, market_ticker)
 
-        # Build similar markets from siblings (excluding the current market)
-        similar = []
-        for sib in siblings:
-            if sib.get('ticker', '').upper() == market_ticker.upper():
-                continue
-            try:
-                yes_pct = int(round(float(sib.get('last_price', '0') or '0') * 100))
-            except (ValueError, TypeError):
-                yes_pct = 0
-            has_edge = abs(yes_pct - 50) > 8
-            name = sib.get('option_name', '') or sib.get('title', 'Unknown')
-            similar.append({
-                'name': name,
-                'yes_pct': yes_pct,
-                'has_edge': has_edge,
-            })
-            if len(similar) >= 3:
-                break
-        data['similar_markets'] = similar
-
-        # Attach metadata about what data sources we used
         data['_sources'] = {
             'kalshi_live': kalshi_data is not None,
             'news_count': len(news),
@@ -440,6 +507,7 @@ def analyze():
             'ticker': market_ticker,
             'event_ticker': event_ticker,
             'sibling_count': len(siblings),
+            'mode': 'quick',
         }
 
         return jsonify({'success': True, 'data': data})

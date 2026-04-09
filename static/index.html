@@ -58,6 +58,23 @@ h1 em{font-style:normal;color:var(--green)}
 .input-btn.loading{animation:pulse 1.4s ease-in-out infinite}
 .input-error{margin-top:10px;font-size:12px;color:var(--red);display:none}
 
+/* MODE TOGGLE */
+.mode-toggle{display:flex;gap:0;margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;width:fit-content}
+.mode-btn{padding:8px 20px;font-size:12px;font-weight:600;color:var(--dim);background:transparent;transition:all .15s;display:flex;align-items:center;gap:6px;border-right:1px solid var(--border)}
+.mode-btn:last-child{border-right:none}
+.mode-btn:hover{color:var(--mid)}
+.mode-btn.active{background:var(--surface-up);color:var(--green)}
+.mode-icon{font-size:14px}
+
+/* AGENT PROGRESS */
+.agent-progress{margin-top:16px;display:flex;flex-direction:column;gap:6px}
+.agent-status{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dim);font-weight:500;letter-spacing:.3px}
+.agent-dot{width:6px;height:6px;border-radius:50%;background:var(--dim);flex-shrink:0;transition:background .3s}
+.agent-status.running .agent-dot{background:var(--amber);animation:pulse 1.2s ease-in-out infinite}
+.agent-status.done .agent-dot{background:var(--green)}
+.agent-status.done{color:var(--green)}
+.agent-status.running{color:var(--amber)}
+
 .input-sub{margin-top:12px;font-size:11px;color:var(--dim);letter-spacing:.3px}
 .input-sub .sep{margin:0 6px;opacity:.5}
 
@@ -169,6 +186,23 @@ h1{font-size:32px}
       <button class="input-btn">Find edge &rarr;</button>
     </div>
 
+    <div class="mode-toggle">
+      <button class="mode-btn active" data-mode="quick">
+        <span class="mode-icon">&#9889;</span> Quick
+      </button>
+      <button class="mode-btn" data-mode="deep">
+        <span class="mode-icon">&#129302;</span> Deep (Agents)
+      </button>
+    </div>
+
+    <div class="agent-progress" id="agent-progress" style="display:none">
+      <div class="agent-status" id="status-news"><span class="agent-dot"></span>News Researcher</div>
+      <div class="agent-status" id="status-data"><span class="agent-dot"></span>Data Researcher</div>
+      <div class="agent-status" id="status-cross"><span class="agent-dot"></span>Cross-Market</div>
+      <div class="agent-status" id="status-contrarian"><span class="agent-dot"></span>Contrarian Analyst</div>
+      <div class="agent-status" id="status-synth"><span class="agent-dot"></span>Synthesizer</div>
+    </div>
+
     <p class="input-sub">No account needed<span class="sep">&middot;</span>Free to use</p>
     <p class="input-error" id="input-error"></p>
   </div>
@@ -275,43 +309,104 @@ document.querySelectorAll('a[href^="#"]').forEach(function(a){
   });
 });
 
+// Mode toggle
+(function(){
+  var currentMode='quick';
+  var modeBtns=document.querySelectorAll('.mode-btn');
+  modeBtns.forEach(function(b){
+    b.addEventListener('click',function(){
+      modeBtns.forEach(function(x){x.classList.remove('active');});
+      b.classList.add('active');
+      currentMode=b.getAttribute('data-mode');
+    });
+  });
+  window._getMode=function(){return currentMode;};
+})();
+
 // Analyze flow
 (function(){
   var input=document.querySelector('.input-bar input');
   var btn=document.querySelector('.input-btn');
   var errEl=document.getElementById('input-error');
+  var progressEl=document.getElementById('agent-progress');
 
   function showError(msg){
     errEl.textContent=msg;errEl.style.display='block';
     setTimeout(function(){errEl.style.display='none';},5000);
   }
 
+  function resetProgress(){
+    progressEl.style.display='none';
+    document.querySelectorAll('.agent-status').forEach(function(el){
+      el.classList.remove('running','done');
+    });
+  }
+
+  function simulateAgentProgress(){
+    progressEl.style.display='flex';
+    var agents=['status-news','status-data','status-cross','status-contrarian'];
+    // Start all 4 agents immediately (they run in parallel)
+    agents.forEach(function(id){
+      document.getElementById(id).classList.add('running');
+    });
+    // Simulate agents completing at staggered times
+    var delays=[3000,4500,5500,7000];
+    agents.forEach(function(id,i){
+      setTimeout(function(){
+        var el=document.getElementById(id);
+        el.classList.remove('running');
+        el.classList.add('done');
+        // After all agents done, start synthesizer
+        if(i===agents.length-1){
+          setTimeout(function(){
+            document.getElementById('status-synth').classList.add('running');
+          },300);
+        }
+      },delays[i]);
+    });
+  }
+
   function doAnalyze(){
     var url=input.value.trim();
     if(!url){showError('Paste a Kalshi market URL to get started.');return;}
 
-    btn.textContent='Analyzing\u2026';
+    var mode=window._getMode();
+    btn.textContent=mode==='deep'?'Agents working\u2026':'Analyzing\u2026';
     btn.classList.add('loading');
     errEl.style.display='none';
+
+    if(mode==='deep'){
+      simulateAgentProgress();
+    }
 
     fetch('/analyze',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({url:url})
+      body:JSON.stringify({url:url,mode:mode})
     })
     .then(function(r){return r.json();})
     .then(function(res){
       if(!res.success){
         btn.textContent='Find edge \u2192';btn.classList.remove('loading');
+        resetProgress();
         showError(res.error||'Analysis failed. Try again.');
         return;
       }
+      // Mark synthesizer done before navigating
+      if(mode==='deep'){
+        var synth=document.getElementById('status-synth');
+        synth.classList.remove('running');
+        synth.classList.add('done');
+      }
       localStorage.setItem('edgefinder_result',JSON.stringify(res.data));
       localStorage.setItem('edgefinder_url',url);
-      window.location.href='/analysis?url='+encodeURIComponent(url);
+      setTimeout(function(){
+        window.location.href='/analysis?url='+encodeURIComponent(url);
+      }, mode==='deep'?500:0);
     })
     .catch(function(){
       btn.textContent='Find edge \u2192';btn.classList.remove('loading');
+      resetProgress();
       showError('Network error. Make sure the server is running.');
     });
   }

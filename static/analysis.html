@@ -212,8 +212,50 @@ if (!_raw) { window.location.replace('/'); }
     return h;
   })()
 
-  // Analysis details
-  +'<div class="card" style="padding:20px"><div class="ad-header">ANALYSIS DETAILS</div><div class="ad-row"><span class="ad-key">Kalshi live data</span><span class="ad-val"'+(src.kalshi_live?' style="color:#38DA8C"':'')+'>'+( src.kalshi_live?'Connected':'Not available')+'</span></div><div class="ad-row"><span class="ad-key">News articles</span><span class="ad-val">'+(src.news_count||0)+' articles</span></div><div class="ad-row"><span class="ad-key">Web sources</span><span class="ad-val">'+(src.web_count||0)+' results</span></div><div class="ad-row"><span class="ad-key">Market ticker</span><span class="ad-val">'+esc(ticker)+'</span></div><div class="ad-row"><span class="ad-key">Model</span><span class="ad-val">Claude Sonnet 4</span></div></div>'
+  // Key factors from synthesis (deep mode only)
+  +(function(){
+    var synth = d._synthesis;
+    if (!synth || !synth.key_factors || !synth.key_factors.length) return '';
+    var h = '<div class="card" style="padding:20px"><div class="ad-header">KEY FACTORS (AGENT SYNTHESIS)</div>';
+    synth.key_factors.forEach(function(kf){
+      var dotColor = kf.direction==='supports_yes'?'#38DA8C':kf.direction==='supports_no'?'#F25454':'#FABA2E';
+      var weightLabel = kf.weight==='high'?'\u25cf\u25cf\u25cf':kf.weight==='medium'?'\u25cf\u25cf':'\u25cf';
+      h += '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #383845">';
+      h += '<div style="width:8px;height:8px;border-radius:50%;background:'+dotColor+';margin-top:4px;flex-shrink:0"></div>';
+      h += '<div style="flex:1"><div style="font-size:12px;font-weight:500;color:#EEEEF2">'+esc(kf.factor)+'</div>';
+      h += '<div style="font-size:11px;color:#8C8C96;margin-top:2px">Weight: '+esc(weightLabel)+'</div></div></div>';
+    });
+    h += '</div>';
+    return h;
+  })()
+
+  // Analysis details — adapt based on mode
+  +(function(){
+    var isDeep = src.mode === 'deep';
+    var h = '<div class="card" style="padding:20px"><div class="ad-header">ANALYSIS DETAILS</div>';
+    h += '<div class="ad-row"><span class="ad-key">Mode</span><span class="ad-val"'+(isDeep?' style="color:#38DA8C"':'')+'>'+( isDeep?'Deep (Agent-Powered)':'Quick')+'</span></div>';
+    h += '<div class="ad-row"><span class="ad-key">Kalshi live data</span><span class="ad-val"'+(src.kalshi_live?' style="color:#38DA8C"':'')+'>'+( src.kalshi_live?'Connected':'Not available')+'</span></div>';
+    if (isDeep && src.agents) {
+      var agentNames = {news_researcher:'News Researcher',data_researcher:'Data Researcher',cross_market:'Cross-Market',contrarian:'Contrarian Analyst'};
+      Object.keys(agentNames).forEach(function(k){
+        var ag = src.agents[k];
+        if (!ag) return;
+        var statusColor = ag.status==='ok'?'#38DA8C':'#F25454';
+        var info = ag.duration ? ag.duration+'s' : '';
+        if (ag.news_count) info += ', '+ag.news_count+' articles';
+        if (ag.web_count) info += ', '+ag.web_count+' web';
+        if (ag.result_count) info += ', '+ag.result_count+' results';
+        h += '<div class="ad-row"><span class="ad-key">'+agentNames[k]+'</span><span class="ad-val" style="color:'+statusColor+'">'+info+'</span></div>';
+      });
+    } else {
+      h += '<div class="ad-row"><span class="ad-key">News articles</span><span class="ad-val">'+(src.news_count||0)+' articles</span></div>';
+      h += '<div class="ad-row"><span class="ad-key">Web sources</span><span class="ad-val">'+(src.web_count||0)+' results</span></div>';
+    }
+    h += '<div class="ad-row"><span class="ad-key">Market ticker</span><span class="ad-val">'+esc(ticker)+'</span></div>';
+    h += '<div class="ad-row"><span class="ad-key">Model</span><span class="ad-val">'+(isDeep?'Haiku 4.5 (agents) + Sonnet 4 (synthesis)':'Claude Sonnet 4')+'</span></div>';
+    h += '</div>';
+    return h;
+  })()
 
   // Actions
   +'<div class="card" style="padding:20px"><div class="actions"><button class="btn-secondary" id="btn-save">Save analysis</button><button class="btn-secondary" id="btn-copy">Copy link</button><button class="btn-primary" id="btn-kalshi">Open on Kalshi \u2192</button></div></div>'
