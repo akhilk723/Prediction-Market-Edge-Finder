@@ -5,10 +5,7 @@ import os
 import json
 import re
 import requests as http_requests
-try:
-    from ddgs import DDGS
-except ImportError:
-    from duckduckgo_search import DDGS
+from ddgs import DDGS
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -158,14 +155,13 @@ def search_news(query, max_results=8):
     def _fetch(q, timelimit, n):
         try:
             results = DDGS().news(
-                keywords=q,
-                region='wt-wt',
-                safesearch='moderate',
+                q,
                 timelimit=timelimit,
                 max_results=n
             )
             return [{'title': r.get('title', ''), 'body': r.get('body', ''), 'source': r.get('source', ''), 'date': r.get('date', '')} for r in results]
-        except Exception:
+        except Exception as e:
+            print(f'[search_news] Error for "{q}": {e}')
             return []
 
     # Try week-scoped first (most relevant)
@@ -194,13 +190,12 @@ def search_web(query, max_results=5):
         try:
             results = DDGS().text(
                 q,
-                region='wt-wt',
-                safesearch='moderate',
                 timelimit=timelimit,
                 max_results=n
             )
             return [{'title': r.get('title', ''), 'body': r.get('body', ''), 'href': r.get('href', '')} for r in results]
-        except Exception:
+        except Exception as e:
+            print(f'[search_web] Error for "{q}": {e}')
             return []
 
     results = _fetch(query, 'w', max_results)
