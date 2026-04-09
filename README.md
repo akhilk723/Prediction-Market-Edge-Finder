@@ -1,5 +1,7 @@
 # EdgeFinder
 
+**[Live Demo](https://edgefinder-six.vercel.app/)**
+
 Prediction market edge analysis tool. Paste a Kalshi market URL, get a structured analysis of whether the contract is mispriced.
 
 ## How it works
